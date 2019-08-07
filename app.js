@@ -1,11 +1,16 @@
 const Express = require('express');
 const app = new Express();
 
-var {getFromPage} = require('./api/crawler');
+var getFromPage = require('./api/getFromPage');
+var getFromApi = require('./api/getFromApi');
 
 // 
-app.get('/getFromPage', function (req, res, next) {
+app.get('/getFromPage', function (req, res) {
   getFromPage()
+})
+
+app.get('/getFromApi', function (req, res) {
+  getFromApi()
 })
 
 // 监听端口、启动程序

@@ -1,5 +1,8 @@
 /**
- * 名称：简单爬虫接口示例
+ * 名称：简单爬虫接口示例：直接爬取页面，解析页面结构
+ * 示例：拉取豆瓣租房7天内的数据
+ * 反反爬虫方案：随机伪装浏览器+随机伪装IP
+ * 
  * 作者：cai jieying
  * 时间：2019/08/06
  */
@@ -8,6 +11,8 @@ var cheerio = require('cheerio');
 var superagent = require('superagent');
 var fs = require('fs');
 var path = require('path');
+
+const my_href = 'https://www.douban.com/group/106955/discussion?start=0';
 
 // 随机假装一个浏览器
 const my_headers = [
@@ -24,7 +29,7 @@ const my_headers = [
   'Lynx/2.8.5rel.1 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/1.2.9',
   "Mozilla/5.0 (X11; Linux i686) AppleWebKit/535.7 (KHTML, like Gecko) Ubuntu/11.04 Chromium/16.0.912.77 Chrome/16.0.912.77 Safari/535.7",
   "Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:10.0) Gecko/20100101 Firefox/10.0 "
-]
+];
 
 // 随机假装一个IP，可以这里找：http://www.goubanjia.com/
 const my_ips = [
@@ -38,12 +43,12 @@ const my_ips = [
   '117.191.11.110:8080',
   '117.191.11.72:8080',
   '117.191.11.107:80'
-]
+];
+
 /**
  * getFromPage
  * 直接爬取页面，根据页面结构解析所需要的数据
- * 示例：拉取豆瓣租房一个月内的数据
- * https://www.douban.com/group/106955/discussion?start=0
+ * 示例：拉取豆瓣租房一段时间内的数据
  */
 const getFromPage = async () => {
   /**
@@ -138,7 +143,7 @@ const getFromPage = async () => {
 
   console.log('开始获取数据...')
   var data = await getOnePage({
-    href: 'https://www.douban.com/group/106955/discussion?start=0', 
+    href: my_href, 
     interval, 
     escapeStr, 
     needArr,
@@ -156,7 +161,7 @@ const getFromPage = async () => {
     }
   
     // 将数据存储本地文件
-    var fileName = `${recDate.getFullYear()}-${recDate.getMonth()+1}-${recDate.getDate()}_${recDate.getHours()}:${recDate.getMinutes()}:${recDate.getSeconds()}.json`;
+    var fileName = `租房数据${recDate.getFullYear()}-${recDate.getMonth()+1}-${recDate.getDate()}_${recDate.getHours()}:${recDate.getMinutes()}:${recDate.getSeconds()}.json`;
     fs.writeFile(path.resolve(__dirname, `../data/${fileName}`), JSON.stringify(saveJSON), function (err) {
       // 判断 如果有错 抛出错误 否则 打印写入成功
       if (err) {
@@ -167,9 +172,4 @@ const getFromPage = async () => {
   }
 }
 
-/**
- * getFromApi
- * 大众点评开放了查询餐馆信息的API
- */
-
-module.exports = { getFromPage }
+module.exports = getFromPage;
