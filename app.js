@@ -1,12 +1,15 @@
-var http = require('http');
-var cheerio = require('cheerio');
-var superagent = require('superagent');
+const Express = require('express');
+const app = new Express();
 
+var {getFromPage} = require('./api/crawler');
 
-superagent.get('https://github.com/').end(function (err,res) {
-    if (err) {
-        console.log(err);
-        return err;
-    }
-    console.log(res.text)
+// 
+app.get('/getFromPage', function (req, res, next) {
+  getFromPage()
+})
+
+// 监听端口、启动程序
+app.listen(3000, err => {
+  if (err) throw err;
+  console.log('server is runing at 3000...');
 })
