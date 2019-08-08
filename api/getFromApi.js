@@ -41,32 +41,57 @@ const my_headers = [
   ];
   
 
-const getFromApi = () => {
-  const type='movie';
-  const tag='豆瓣高分';
-  const sort='recommend';
-  const page_limit=25;
-  const page_start=0;
-  const href = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${tag}&sort=${sort}&page_limit=${page_limit}&page_start=${page_start}`;
-  superagent.get(href)
-    .set('Server', 'dae')
-    .set('Transfer-Encoding', 'chunked')
-    .set('Vary', 'Accept-Encoding')
-    .set('X-Content-Type-Options', 'nosniff')
-    .set('X-DAE-App', 'movie')
-    .set('X-DAE-Node', 'fram28')
-    .set('X-Douban-Mobileapp', 0)
-    .set('X-Xss-Protection', '1; mode=block')
-    .set('User-Agent', my_headers[Math.floor(Math.random() * 13)]) // 模拟浏览器行为
-    .set('Remote-Address', my_ips[Math.floor(Math.random() * 10)]) // 安全起见换个IP
-    .set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3')
-    .end(function (err, res) {
+const getFromApi = async () => {
+  const href = `https://movie.douban.com/ithil_j/activity/movie_annual2018/widget/1`;
+  try {
+    let data = await new Promise((resolve, reject) => {
+      superagent.get(href)
+      .set('User-Agent', my_headers[Math.floor(Math.random() * 13)]) // 模拟浏览器行为
+      .set('Remote-Address', my_ips[Math.floor(Math.random() * 10)]) // 安全起见换个IP
+      .set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3')
+      // .buffer(true)
+      .end(function (err, res) {
+        if (err) {
+          console.log('err happen', err);
+          return err;
+        }
+        const resData = res.body;
+        const ret = [];
+        // 分别获取：排名、海报、名称、评分，评分人数
+        for (let i=0; i<resData.res.subjects.length; i++) {
+          let movie = resData.res.subjects[i]
+          ret.push({
+            ranking: i+1,
+            poster: movie.cover,
+            title: movie.title,
+            rating: movie.rating,
+            rating_count: movie.rating_count
+          })
+        }
+  
+        resolve(ret)
+      })
+    }) 
+
+    var recDate = new Date();
+    var saveJSON = {
+      updateTime: recDate.toLocaleString(),
+      data
+    }
+    // 将数据存储本地文件
+    var fileName = `电影数据${recDate.getTime()}.json`;
+    fs.writeFile(path.resolve(__dirname, `../data/${fileName}`), JSON.stringify(saveJSON), function (err) {
+      // 判断 如果有错 抛出错误 否则 打印写入成功
       if (err) {
-        console.log('err happen', err);
-        return err;
-      }
-      console.log(res)
+          throw err;
+      } 
+      console.log('写入文件成功!')
     })
+
+    return saveJSON;
+  } catch (err) {
+    console.error(`[getFromApi] ${err}`)
+  }
 }
 
 module.exports = getFromApi;
