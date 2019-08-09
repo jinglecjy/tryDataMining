@@ -49,37 +49,34 @@ app.get('/getip', async (req, res) => {
   }
 })
 
-app.get('/getFromPage', async (req, res) => {
+app.get('/analysisRent', async (req, res) => {
   try {
-    // 获取数据
-    // let pachongData = {}
-    // if(true) { // 如果本地没有今日数据，爬虫获取
-    //   pachongData =  await getFromPage()
-    // } else { // 如果今天已经获取过数据
-
-    // }
+    // 1. 获取数据：如果本地有1天以内的数据就直接获取本地数据，否则爬虫
     let pachongFile = await hasLocal()
-    // let pachongData = {}
-    // if (pachongFile.filename) {
-    //   console.log(pachongFile.filename)
-    //   pachongData = fs.readFileSync(path.resolve(__dirname, `./data/${pachongFile.filename}`))
-    // }
-    
-    // // 对标题分词
-    // let fenciData = {
-    //   updateTime: pachongData.updateTime,
-    //   data: []
-    // }
-    // for (const item of pachongData.data) {
-    //   fenciData.data.push({
-    //     title: item.title,
-    //     titleBreak: fenci(item.title),
-    //     href: item.href,
-    //     date: item.date
-    //   })
-    // }
+    let pachongData = {}
+    if (pachongFile.filename) {
+      console.log(pachongFile.filename)
+      pachongData = fs.readFileSync(path.resolve(__dirname, `./data/${pachongFile.filename}`))
+    }
+    pachongData = JSON.parse(pachongData)
 
-    // return res.jsonp(fenciData)
+    // 2. 对标题分词并去除停用词
+    let fenciData = {
+      updateTime: pachongData.updateTime,
+      data: []
+    }
+    for (const item of pachongData.data) {
+      fenciData.data.push({
+        title: item.title,
+        titleBreak: fenci(item.title),
+        href: item.href,
+        date: item.date
+      })
+    }
+
+    console.log(fenciData)
+
+    return res.jsonp(fenciData)
   } catch (err) {
     console.error(`[getFromPage] catch ${err}`)
     return res.jsonp(err)

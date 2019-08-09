@@ -35,6 +35,23 @@ const my_headers = [
 // 用匿名ip伪装
 const my_ips = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../data/ip_list.json'), 'utf-8'))
 
+// 生成11位随机cookie
+const randomString = (len) => {
+  len = len || 11;
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';    
+  var maxPos = chars.length;
+  var pwd = '';
+  for (i = 0; i < len; i++) {
+    pwd += chars.charAt(Math.floor(Math.random() * maxPos));
+  }
+  return pwd;
+}
+
+const sleep = (timeountMS) => new Promise((resolve) => {
+  setTimeout(resolve, timeountMS);
+});
+
+
 /**
  * getFromPage
  * 直接爬取页面，根据页面结构解析所需要的数据
@@ -47,9 +64,11 @@ const getFromPage = async () => {
    * @param {*} interval 时间间隔，多少时间以内的数据，单位ms，默认一天
    * @param {*} escapeArr 屏蔽含有不需要字段的数据，默认为[]
    * @param {*} needArr 屏蔽不含有所需字段的数据，默认为[]
+   * @param {*} bid cookie随机bid
    * @param {*} data 递归数据，默认为[]
    */
-  const getOnePage = async ({href, interval=86400000, escapeArr=[], needArr=[], data=[]}) => {
+  const getOnePage = async ({href, interval=86400000, escapeArr=[], needArr=[], bid='', data=[]}) => {
+    if (bid === '') bid = randomString()
     console.log(href)
     if (!href || typeof href !== 'string' 
     || typeof escapeArr !== 'object' || typeof escapeArr.length === 'undefined'
@@ -77,6 +96,7 @@ const getFromPage = async () => {
         'User-Agent': my_headers[Math.floor(Math.random()*13)],
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'Cookie': `bid=${bid}`,
         // 'Cookie': 'bid=WBBjEEBmCWU; douban-fav-remind=1; __yadk_uid=99RsXomvOSPycWFHGHxIpjYS1eFZhu0H; ll="118282"; _vwo_uuid_v2=D8444AC897C394988E99A00903CD117BA|10e38dcef1dbdb61eda3871d4ec28215; douban-profile-remind=1; __utma=30149280.394892219.1561877039.1561877039.1561877039.1; __utmz=30149280.1561877039.1.1.utmcsr=baidu|utmccn=(organic)|utmcmd=organic; trc_cookie_storage=taboola%2520global%253Auser-id%3Dff42986e-16bf-47f2-b008-d9e91cae042f-tuct3e10dfe; viewed="2885672"; gr_user_id=612daebc-c256-4a98-8576-cc9dd4166e06; __gads=ID=28d0a849f4310fa0:T=1565229993:S=ALNI_MZsnL6rKEJb8j73lo_p-K4W2GFgFg; ap_v=0,6.0; _pk_ref.100001.8cb4=%5B%22%22%2C%22%22%2C1565266786%2C%22https%3A%2F%2Fwww.baidu.com%2Flink%3Furl%3DnOEfr9i-iUK32sumuyKDFYLlzaIXpLI4lJW33nCFV0aMMoehA_t6ie3fWrZkzV5xo6tL2Fl_WVH1UMnCGqJ_ga%26wd%3D%26eqid%3Dd1344776000cf918000000065d4c135e%22%5D; _pk_ses.100001.8cb4=*; _pk_id.100001.8cb4=f5a05832f1f7d60b.1558699588.15.1565266855.1565263933.',
         'Remote-Address': ip
       };
@@ -92,49 +112,56 @@ const getFromPage = async () => {
       .set('Connection', 'keep-alive')
       .set('Remote-Address', ip)
       .set('header', header)
-      .set('Cookie', 'bid=WBBjEEBmCWU')
+      .set('Cookie', `bid=${bid}`)
       // .proxy(ip)
       .end(function (err,res) {
-        console.log('finished')
         if (err) {
             console.log('err happen', err);
-            return err;
+            return getOnePage({
+              href: ret.nextHref, 
+              interval, 
+              escapeArr,
+              needArr,
+              bid:'',
+              data: ret.data
+            })
+        } else {
+          // console.log(res.text)
+          const $ = cheerio.load(res.text);
+          let isOverDate = false;
+          $('#content .article .olt tr').each(function(index, item) {
+            const title = $(item).children('.title').children('a').attr('title');
+            const href = $(item).children('.title').children('a').attr('href');
+            let date = $(item).children('.time').text();
+            
+            if (title && href && date) { // 过滤处理数据
+              if (!/\d{4}-\d{2}-\d{2}/g.test(date)) { // 补充年份
+                date = `${new Date().getFullYear()}-${date}`
+              }
+              if ((+new Date() - +new Date(date)) - interval > 1e-5) {
+                isOverDate = true
+              } 
+
+              if (!isOverDate && 
+                  !(escapeArr.length>0 && escapeReg.test(title)) && 
+                  !(needArr.length>0 && !needReg.test(title))) {
+                data.push({
+                  title,
+                  href,
+                  date
+                })
+              }
+            }
+          })
+
+          let nextHref = $('.paginator .next a').attr('href')
+
+          resolve({
+            isOverDate,
+            data,
+            nextHref
+          })
         }
-        // console.log(res.text)
-        const $ = cheerio.load(res.text);
-        let isOverDate = false;
-        $('#content .article .olt tr').each(function(index, item) {
-          const title = $(item).children('.title').children('a').attr('title');
-          const href = $(item).children('.title').children('a').attr('href');
-          let date = $(item).children('.time').text();
-          
-          if (title && href && date) { // 过滤处理数据
-            if (!/\d{4}-\d{2}-\d{2}/g.test(date)) { // 补充年份
-              date = `${new Date().getFullYear()}-${date}`
-            }
-            if ((+new Date() - +new Date(date)) - interval > 1e-5) {
-              isOverDate = true
-            } 
-
-            if (!isOverDate && 
-                !(escapeArr.length>0 && escapeReg.test(title)) && 
-                !(needArr.length>0 && !needReg.test(title))) {
-              data.push({
-                title,
-                href,
-                date
-              })
-            }
-          }
-        })
-
-        let nextHref = $('.paginator .next a').attr('href')
-
-        resolve({
-          isOverDate,
-          data,
-          nextHref
-        })
       })
     })
 
@@ -142,14 +169,15 @@ const getFromPage = async () => {
       return ret;
     }
     else {
-      // 延时一会儿会儿，标识我不是个机器人
-      await sleep(5000)
+      // 延时一小会儿，卑微求不封
+      await sleep(4000)
 
       return getOnePage({
         href: ret.nextHref, 
         interval, 
         escapeArr,
         needArr,
+        bid,
         data: ret.data
       })
     }
@@ -157,8 +185,10 @@ const getFromPage = async () => {
 
   // 递归获取多页数据处理
   const interval = 1000 * 60 * 60 * 24 * 7; // 7天内
-  const escapeStr = ['求租', '合租'];
-  const needArr = ['宝安'];
+  // const escapeStr = ['求租', '合租'];
+  // const needArr = ['宝安'];
+  const escapeStr = [];
+  const needArr = [];
 
   console.log('开始获取数据...')
   var data = await getOnePage({
